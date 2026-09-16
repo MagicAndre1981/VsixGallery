@@ -9,11 +9,12 @@ namespace VsixGallery
 	internal static class ImageContrastAnalyzer
 	{
 		private const double MinimumContrastRatio = 1.8;
+		private const double MinimumColorSeparation = 32d / 255;
 		private const double MaximumLowContrastFraction = 0.9;
 		private const byte MinimumVisibleAlpha = 32;
 
-		private static readonly double _darkBackgroundLuminance = RelativeLuminance(30, 30, 30);
-		private static readonly double _lightBackgroundLuminance = RelativeLuminance(255, 255, 255);
+		private const byte DarkBackgroundComponent = 30;
+		private const byte LightBackgroundComponent = 255;
 
 		public static bool TryAnalyze(string path, out ImageContrastResult result)
 		{
@@ -45,15 +46,14 @@ namespace VsixGallery
 						}
 
 						double alpha = color.Alpha / 255d;
-						double foregroundLuminance = RelativeLuminance(color.Red, color.Green, color.Blue);
 						visibleWeight += alpha;
 
-						if (ContrastAgainstBackground(foregroundLuminance, alpha, _darkBackgroundLuminance) < MinimumContrastRatio)
+						if (HasLowContrast(color, alpha, DarkBackgroundComponent))
 						{
 							darkLowContrastWeight += alpha;
 						}
 
-						if (ContrastAgainstBackground(foregroundLuminance, alpha, _lightBackgroundLuminance) < MinimumContrastRatio)
+						if (HasLowContrast(color, alpha, LightBackgroundComponent))
 						{
 							lightLowContrastWeight += alpha;
 						}
@@ -77,16 +77,26 @@ namespace VsixGallery
 			}
 		}
 
-		private static double ContrastAgainstBackground(
-			double foregroundLuminance,
-			double alpha,
-			double backgroundLuminance)
+		private static bool HasLowContrast(SKColor color, double alpha, byte backgroundComponent)
 		{
+			double backgroundLuminance = RelativeLuminance(
+				backgroundComponent,
+				backgroundComponent,
+				backgroundComponent);
+			double foregroundLuminance = RelativeLuminance(color.Red, color.Green, color.Blue);
 			double compositeLuminance =
 				(alpha * foregroundLuminance) + ((1 - alpha) * backgroundLuminance);
 			double lighter = Math.Max(compositeLuminance, backgroundLuminance);
 			double darker = Math.Min(compositeLuminance, backgroundLuminance);
-			return (lighter + 0.05) / (darker + 0.05);
+			double contrastRatio = (lighter + 0.05) / (darker + 0.05);
+			double colorSeparation = alpha * Math.Max(
+				Math.Abs(color.Red - backgroundComponent),
+				Math.Max(
+					Math.Abs(color.Green - backgroundComponent),
+					Math.Abs(color.Blue - backgroundComponent))) / 255;
+
+			return contrastRatio < MinimumContrastRatio &&
+				colorSeparation < MinimumColorSeparation;
 		}
 
 		private static double RelativeLuminance(byte red, byte green, byte blue) =>

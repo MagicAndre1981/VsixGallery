@@ -202,6 +202,27 @@ public class PackageHelperTests
 	}
 
 	[Fact]
+	public void Validate_DoesNotWarnWhenIconHasChromaticContrast()
+	{
+		using TemporaryGallery gallery = new();
+		string purpleIconPath = Path.Combine(gallery.Root, "purple.png");
+		string yellowIconPath = Path.Combine(gallery.Root, "yellow.png");
+		WriteSolidPng(purpleIconPath, new SKColor(104, 33, 122));
+		WriteSolidPng(yellowIconPath, new SKColor(250, 250, 0));
+
+		Package purplePackage = CreateValidPackage("purple.png");
+		Package yellowPackage = CreateValidPackage("yellow.png");
+
+		gallery.Helper.Validate(purplePackage, gallery.Root);
+		gallery.Helper.Validate(yellowPackage, gallery.Root);
+
+		Assert.DoesNotContain(purplePackage.Validation, finding =>
+			finding.Code == "icon.low-contrast-dark-theme");
+		Assert.DoesNotContain(yellowPackage.Validation, finding =>
+			finding.Code == "icon.low-contrast-light-theme");
+	}
+
+	[Fact]
 	public void Validate_PreservesSourceIconContrastWarningAfterGalleryConversion()
 	{
 		using TemporaryGallery gallery = new();
